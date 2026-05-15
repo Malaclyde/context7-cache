@@ -4,7 +4,7 @@ import { mkdirSync } from "fs"
 import { tool } from "@opencode-ai/plugin"
 import type { Plugin } from "@opencode-ai/plugin"
 import { Database } from "bun:sqlite"
-import { pipeline } from "@huggingface/transformers"
+
 
 const API_BASE = "https://context7.com/api"
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -163,6 +163,7 @@ export default (async function context7Plugin(ctx, options) {
 
   async function getEmbedding(text: string): Promise<Float32Array> {
     if (!extractor) {
+      const { pipeline } = await import("@huggingface/transformers") as any
       extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2")
     }
     const result = await extractor(text, { pooling: "mean", normalize: true })
