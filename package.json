@@ -1,6 +1,6 @@
 {
   "name": "@malaclyde/context7-cache-oc",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "OpenCode plugin — caches Context7 documentation lookups in SQLite + embeddings + FTS5",
   "type": "module",
   "main": "dist/index.js",
