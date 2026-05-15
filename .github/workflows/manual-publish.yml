@@ -1,0 +1,79 @@
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate app token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GH_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.GH_ACTIONS_APP_PRIVATE_KEY }}
+
+      - name: Configure git auth
+        run: |
+          git config --unset-all http.https://github.com/.extraheader
+          git remote set-url origin https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git
+
+      - name: Fetch version refs
+        run: git fetch origin "refs/version/*:refs/version/*"
+
+      - name: Read latest version
+        id: version
+        run: |
+          REF=$(git for-each-ref --format='%(refname:strip=2)' refs/version | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          if [ -z "$REF" ]; then
+            echo "No version ref found"
+            exit 1
+          fi
+          echo "version=$REF" >> $GITHUB_OUTPUT
+
+      - name: Set version in package.json files
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          for pkg in package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json; do
+            echo "Updating $pkg to $V"
+            node -e "
+              const p = require('./$pkg');
+              p.version = '$V';
+              require('fs').writeFileSync('./$pkg', JSON.stringify(p, null, 2) + '\n');
+            "
+          done
+
+      - name: Publish @malaclyde/knowledge-base
+        run: npx -p npm@11 npm publish --access public
+
+      - name: Publish @malaclyde/coding-memory-oc
+        working-directory: opencode/coding-memory
+        run: npx -p npm@11 npm publish --access public
+
+      - name: Publish @malaclyde/assistant-memory-oc
+        working-directory: opencode/assistant-memory
+        run: npx -p npm@11 npm publish --access public
+
+      - name: Commit version bumps
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          git add package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json
+          git -c user.name="gh-actions" -c user.email="actions@github.com" commit -m "[noCI] Bump version to $V"
+          git push --force

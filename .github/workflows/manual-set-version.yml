@@ -1,0 +1,69 @@
+# Manually set any version (all three digits). Creates ref and updates pyproject.toml.
+# Useful for major/minor bumps before a release.
+
+name: Manual Set Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      major:
+        description: Major version
+        required: true
+        type: number
+      minor:
+        description: Minor version
+        required: true
+        type: number
+      patch:
+        description: Patch version
+        required: true
+        type: number
+
+jobs:
+  set-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GH_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.GH_ACTIONS_APP_PRIVATE_KEY }}
+
+      - name: Configure git auth
+        run: |
+          git config --unset-all http.https://github.com/.extraheader
+          git remote set-url origin https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git
+
+      - name: Build version string
+        id: version
+        run: |
+          V="${{ inputs.major }}.${{ inputs.minor }}.${{ inputs.patch }}"
+          echo "new_version=$V" >> $GITHUB_OUTPUT
+
+      - name: Create version ref
+        run: |
+          git update-ref "refs/version/${{ steps.version.outputs.new_version }}" HEAD
+          git push --force origin "refs/version/${{ steps.version.outputs.new_version }}"
+
+      - name: Update package.json files
+        run: |
+          V="${{ steps.version.outputs.new_version }}"
+          for pkg in package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json; do
+            node -e "
+              const p = require('./$pkg');
+              p.version = '$V';
+              require('fs').writeFileSync('./$pkg', JSON.stringify(p, null, 2) + '\n');
+            "
+          done
+
+      - name: Commit and push
+        run: |
+          V="${{ steps.version.outputs.new_version }}"
+          git add package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json
+          git -c user.name="crawler-bot" -c user.email="bot@malaclyde.dev" commit -m "Set version to $V"
+          git push --force

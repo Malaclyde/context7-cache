@@ -1,0 +1,53 @@
+# Auto-increment patch version on every merge to main.
+# E.g. 0.1.1 → 0.1.2. Updates refs/version/ and pyproject.toml.
+
+name: Auto Patch Bump
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump:
+    if: ${{ !contains(github.event.head_commit.message, '[noCI]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate app token
+        id: generate-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.GH_ACTIONS_APP_ID }}
+          private-key: ${{ secrets.GH_ACTIONS_APP_PRIVATE_KEY }}
+
+      - name: Configure git auth
+        run: |
+          git config --unset-all http.https://github.com/.extraheader
+          git remote set-url origin https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/${{ github.repository }}.git
+
+      - name: Fetch version refs
+        run: git fetch origin "refs/version/*:refs/version/*"
+
+      - name: Read and bump patch version
+        id: version
+        run: |
+          REF=$(git for-each-ref --format='%(refname:strip=2)' refs/version | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          if [ -z "$REF" ]; then
+            echo "No version ref found, starting at 0.1.0"
+            echo "new_version=0.0.1" >> $GITHUB_OUTPUT
+          else
+            MAJOR=$(echo "$REF" | cut -d. -f1)
+            MINOR=$(echo "$REF" | cut -d. -f2)
+            PATCH=$(echo "$REF" | cut -d. -f3)
+            NEW_PATCH=$((PATCH + 1))
+            echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> $GITHUB_OUTPUT
+            echo "Bumping $REF → $MAJOR.$MINOR.$NEW_PATCH"
+          fi
+
+      - name: Create version ref
+        run: |
+          git update-ref "refs/version/${{ steps.version.outputs.new_version }}" HEAD
+          git push --force origin "refs/version/${{ steps.version.outputs.new_version }}"
