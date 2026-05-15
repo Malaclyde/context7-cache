@@ -1,4 +1,4 @@
-# Manually set any version (all three digits). Creates ref and updates pyproject.toml.
+# Manually set any version (all three digits). Creates ref and updates package.json.
 # Useful for major/minor bumps before a release.
 
 name: Manual Set Version
@@ -50,20 +50,18 @@ jobs:
           git update-ref "refs/version/${{ steps.version.outputs.new_version }}" HEAD
           git push --force origin "refs/version/${{ steps.version.outputs.new_version }}"
 
-      - name: Update package.json files
+      - name: Update package.json
         run: |
           V="${{ steps.version.outputs.new_version }}"
-          for pkg in package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json; do
-            node -e "
-              const p = require('./$pkg');
-              p.version = '$V';
-              require('fs').writeFileSync('./$pkg', JSON.stringify(p, null, 2) + '\n');
-            "
-          done
+          node -e "
+            const p = require('./package.json');
+            p.version = '$V';
+            require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
+          "
 
       - name: Commit and push
         run: |
           V="${{ steps.version.outputs.new_version }}"
-          git add package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json
+          git add package.json
           git -c user.name="crawler-bot" -c user.email="bot@malaclyde.dev" commit -m "Set version to $V"
           git push --force

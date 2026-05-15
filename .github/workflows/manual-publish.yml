@@ -15,13 +15,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Generate app token
         id: generate-token
@@ -48,32 +52,24 @@ jobs:
           fi
           echo "version=$REF" >> $GITHUB_OUTPUT
 
-      - name: Set version in package.json files
+      - name: Set version in package.json
         run: |
           V="${{ steps.version.outputs.version }}"
-          for pkg in package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json; do
-            echo "Updating $pkg to $V"
-            node -e "
-              const p = require('./$pkg');
-              p.version = '$V';
-              require('fs').writeFileSync('./$pkg', JSON.stringify(p, null, 2) + '\n');
-            "
-          done
+          node -e "
+            const p = require('./package.json');
+            p.version = '$V';
+            require('fs').writeFileSync('./package.json', JSON.stringify(p, null, 2) + '\n');
+          "
 
-      - name: Publish @malaclyde/knowledge-base
+      - name: Build
+        run: bun run build
+
+      - name: Publish
         run: npx -p npm@11 npm publish --access public
 
-      - name: Publish @malaclyde/coding-memory-oc
-        working-directory: opencode/coding-memory
-        run: npx -p npm@11 npm publish --access public
-
-      - name: Publish @malaclyde/assistant-memory-oc
-        working-directory: opencode/assistant-memory
-        run: npx -p npm@11 npm publish --access public
-
-      - name: Commit version bumps
+      - name: Commit version bump
         run: |
           V="${{ steps.version.outputs.version }}"
-          git add package.json opencode/coding-memory/package.json opencode/assistant-memory/package.json
+          git add package.json
           git -c user.name="gh-actions" -c user.email="actions@github.com" commit -m "[noCI] Bump version to $V"
           git push --force
