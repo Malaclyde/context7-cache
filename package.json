@@ -19,11 +19,11 @@
     "url": "https://github.com/Malaclyde/context7-cache"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir=dist --target=bun --external=@opencode-ai/plugin --external=@xenova/transformers",
+    "build": "bun build ./src/index.ts --outdir=dist --target=bun --external=@opencode-ai/plugin --external=@huggingface/transformers",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@xenova/transformers": "^2.17.2"
+    "@huggingface/transformers": "^4.2.0"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "^1.14.48"

@@ -4,7 +4,7 @@ import { mkdirSync } from "fs"
 import { tool } from "@opencode-ai/plugin"
 import type { Plugin } from "@opencode-ai/plugin"
 import { Database } from "bun:sqlite"
-import { pipeline } from "@xenova/transformers"
+import { pipeline } from "@huggingface/transformers"
 
 const API_BASE = "https://context7.com/api"
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
